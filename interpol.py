@@ -12,7 +12,7 @@ def getDetails(url):
   soup = BeautifulSoup(r.text)
 
   subject = {}
-  subject['photo'] = "http://interpol.int/%s " % soup.find('img', { 'class': 'photo' }).get('src')
+  subject['photo'] = "http://interpol.int%s " % soup.find('img', { 'class': 'photo' }).get('src')
 
   for section in soup.findAll('table', { 'class': 'table_detail_profil' }):
     for row in section.findAll('tr'):
