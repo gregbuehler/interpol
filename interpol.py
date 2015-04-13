@@ -7,8 +7,10 @@ import os, sys
 import pprint
 from bs4 import BeautifulSoup
 
+result = []
+
 def getDetails(url):
-  r = requests.get(url)  
+  r = requests.get(url)
   soup = BeautifulSoup(r.text)
 
   subject = {}
@@ -50,7 +52,7 @@ def getDetails(url):
         subject['charges'] = row.find('td', { 'class': 'col2' }).text.strip()
 
 
-  print json.dumps(subject)
+  return subject
 
 def getSex(sex):
   return {
@@ -303,6 +305,22 @@ def getNationality(nationality):
     "zimbabwe": "340",
   }.get(nationality.lower(), '')
 
+def search_url(url):
+    searchEndpoint = url
+
+    headers = {
+        'User-Agent': "Mozilla/4.0",
+        'Host': 'www.interpol.int',
+        'Origin': 'http://www.interpol.int',
+        'Referer': 'http://www.interpol.int/notice/search/wanted'
+    }
+
+    r = requests.get(searchEndpoint, headers=headers)
+    soup = BeautifulSoup(r.text)
+
+    for person in soup.findAll('a', { 'class': 'details' }):
+      result.append(getDetails("http://www.interpol.int%s" % person['href']))
+
 def search(lastname="", forenames="", nationality="", text="", age_min=0, age_max=100, sex="", eyes="", hair="", wantedby=""):
 
   searchEndpoint = "http://interpol.int/notice/search/wanted"
@@ -332,9 +350,20 @@ def search(lastname="", forenames="", nationality="", text="", age_min=0, age_ma
   r = requests.post(searchEndpoint, headers=headers, data=query)
   soup = BeautifulSoup(r.text)
 
-  result = []
-  for result in soup.findAll('a', { 'class': 'details' }):
-    getDetails("http://www.interpol.int%s" % result['href'])
+  for person in soup.findAll('a', { 'class': 'details' }):
+    result.append(getDetails("http://www.interpol.int%s" % person['href']))
+
+  pagenation = soup.find('span', { 'class': 'num_page' })
+  pageCount = pagenation.findAll('span')[-1].findAll('a')[0].text
+  pageUrl = pagenation.findAll('span')[-1].findAll('a')[0]['href']
+
+  maxOffset = (int(pageCount) - 1) * 9
+  for page in range(2, int(pageCount) - 1):
+    currentOffset = int(page) * 9
+    search_url("http://www.interpol.int%s" % pageUrl.replace('(offset)/%d' % maxOffset, '(offset)/%d' % currentOffset))
+
+
+# main -------------------------------------------------------------------------
 
 parser = argparse.ArgumentParser(description="Interpol query tool", add_help=False)
 parser.add_argument('-v', '--verbose', help='verbose output', action='store_true')
@@ -355,3 +384,4 @@ if len(sys.argv) == 1:
    sys.exit(1)
 
 search(lastname=args['lastname'], forenames=args['firstname'], nationality=args['nationality'],text=args['freetext'], age_min=args['age_min'], age_max=args['age_max'], sex=args['sex'], eyes=args['eyes'], hair=args['hair'], wantedby=args['wantedby'])
+print json.dumps(result, indent=2)
